@@ -25,6 +25,7 @@ const sitesRoutes = require('./routes/sites');
 const notificationsRoutes = require('./routes/notifications');
 const lineRoutes = require('./routes/line');
 const usersRoutes = require('./routes/users');
+const broadcastRoutes = require('./routes/broadcast');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -77,6 +78,7 @@ app.use('/api/sites', sitesRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/line', lineRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/broadcast', broadcastRoutes);
 
 // Admin page route
 app.get('/admin', (req, res) => {
