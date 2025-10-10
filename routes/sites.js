@@ -7,14 +7,18 @@ const adminNotificationService = require('../services/adminNotificationService')
 
 const router = express.Router();
 
-// Get all monitored sites (shared) - public
-router.get('/', async (req, res) => {
+// Get user's monitored sites (user-specific)
+router.get('/', authenticateToken, async (req, res) => {
     try {
+        const userId = req.user.id;
+        
         const [sites] = await pool.execute(
             `SELECT id, url, name, check_interval_hours, keywords, is_active, 
                     last_check, created_at, updated_at
              FROM monitored_sites 
-             ORDER BY created_at DESC`
+             WHERE user_id = ?
+             ORDER BY created_at DESC`,
+            [userId]
         );
 
         // Get latest check results for each site
@@ -51,17 +55,18 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Get single monitored site (public)
-router.get('/:id', async (req, res) => {
+// Get single monitored site (user-specific)
+router.get('/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
+        const userId = req.user.id;
 
         const [sites] = await pool.execute(
             `SELECT id, url, name, check_interval_hours, keywords, is_active, 
                     last_check, created_at, updated_at
              FROM monitored_sites 
-             WHERE id = ?`,
-            [id]
+             WHERE id = ? AND user_id = ?`,
+            [id, userId]
         );
 
         if (sites.length === 0) {
