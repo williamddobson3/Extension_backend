@@ -418,13 +418,32 @@ class NotificationService {
             if (!user.line_user_id) {
                 throw new Error('LINE user ID not configured');
             }
+            
+            // Validate LINE User ID format
+            if (typeof user.line_user_id !== 'string') {
+                throw new Error('LINE user ID must be a string');
+            }
+            
+            // Trim whitespace and validate format
+            const trimmedLineUserId = user.line_user_id.trim();
+            if (!trimmedLineUserId) {
+                throw new Error('LINE user ID is empty');
+            }
+            
+            if (!trimmedLineUserId.startsWith('U')) {
+                throw new Error('LINE user ID must start with "U"');
+            }
+            
+            if (trimmedLineUserId.length < 30) {
+                throw new Error('LINE user ID appears to be too short');
+            }
 
             if (!this.lineConfig.channelAccessToken) {
                 throw new Error('LINE channel access token not configured');
             }
 
             const lineMessage = {
-                to: user.line_user_id,
+                to: trimmedLineUserId,
                 messages: [
                     {
                         type: 'text',
@@ -466,11 +485,22 @@ ${message}
             // Check for specific LINE API errors
             let errorMessage = error.message;
             if (error.response && error.response.data) {
-                if (error.response.data.message === "You can't send messages to yourself") {
+                const apiError = error.response.data.message;
+                
+                if (apiError === "You can't send messages to yourself") {
                     errorMessage = 'エラー: ボット自身のLINE IDが設定されています。正しいユーザーのLINE IDを設定してください。';
                     console.error('⚠️ Bot tried to send message to itself. User needs to update their LINE ID.');
-                } else if (error.response.data.message) {
-                    errorMessage = `LINE API Error: ${error.response.data.message}`;
+                } else if (apiError.includes("The user hasn't added the LINE Official Account as a friend")) {
+                    errorMessage = 'エラー: ユーザーがLINEボットを友達に追加していません。';
+                    console.error('⚠️ User needs to add the bot as a friend.');
+                } else if (apiError.includes("invalid")) {
+                    errorMessage = 'エラー: LINE User IDの形式が無効です。';
+                    console.error('⚠️ Invalid LINE User ID format.');
+                } else if (apiError.includes("The property, 'to'")) {
+                    errorMessage = 'エラー: LINE User IDが無効です。正しい形式で入力してください。';
+                    console.error('⚠️ Invalid LINE User ID in "to" field.');
+                } else if (apiError) {
+                    errorMessage = `LINE API Error: ${apiError}`;
                 }
             }
             
