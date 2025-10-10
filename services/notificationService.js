@@ -428,13 +428,14 @@ class NotificationService {
                 messages: [
                     {
                         type: 'text',
-                        text: `🔔 ウェブサイト更新が検出されました！<br/>
-📊 サイト: ${siteName}<br/>
-🌐 URL: ${siteUrl}<br/>
-<br/>
-📝 詳細:<br/>
-${message}<br/>
-<br/>
+                        text: `🔔 ウェブサイト更新が検出されました！
+
+📊 サイト: ${siteName}
+🌐 URL: ${siteUrl}
+
+📝 詳細:
+${message}
+
 この通知は、ウェブサイト監視システムによって自動的に送信されました。`
                     }
                 ]

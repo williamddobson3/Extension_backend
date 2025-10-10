@@ -44,13 +44,20 @@ router.post('/register', async (req, res) => {
             });
         }
 
-        // Check if user already exists
+        // Check if user already exists (including blocked users)
         const [existingUsers] = await pool.execute(
-            'SELECT id FROM users WHERE username = ? OR email = ?',
+            'SELECT id, is_blocked FROM users WHERE username = ? OR email = ?',
             [username, email]
         );
 
         if (existingUsers.length > 0) {
+            const existingUser = existingUsers[0];
+            if (existingUser.is_blocked) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'This account has been blocked and cannot be re-registered'
+                });
+            }
             return res.status(409).json({
                 success: false,
                 message: 'User ID or email already exists'
@@ -121,7 +128,7 @@ router.post('/login', async (req, res) => {
 
         // Find user
         const [users] = await pool.execute(
-            'SELECT id, username, email, password_hash, is_active, is_admin FROM users WHERE username = ? OR email = ?',
+            'SELECT id, username, email, password_hash, is_active, is_admin, is_blocked FROM users WHERE username = ? OR email = ?',
             [username, username]
         );
 
@@ -133,6 +140,14 @@ router.post('/login', async (req, res) => {
         }
 
         const user = users[0];
+
+        // Check if user is blocked
+        if (user.is_blocked) {
+            return res.status(403).json({
+                success: false,
+                message: 'Account has been blocked by administrator'
+            });
+        }
 
         // Check if user is active
         if (!user.is_active) {

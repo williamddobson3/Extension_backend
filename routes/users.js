@@ -15,6 +15,9 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
                 u.line_user_id, 
                 u.is_active, 
                 u.is_admin, 
+                u.is_blocked,
+                u.blocked_at,
+                u.block_reason,
                 u.created_at,
                 COUNT(ms.id) as site_count
             FROM users u
@@ -32,6 +35,9 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
                 line_user_id: user.line_user_id,
                 is_active: user.is_active,
                 is_admin: user.is_admin,
+                is_blocked: user.is_blocked,
+                blocked_at: user.blocked_at,
+                block_reason: user.block_reason,
                 created_at: user.created_at,
                 site_count: user.site_count
             }))
@@ -141,6 +147,121 @@ router.put('/:id/toggle-active', authenticateToken, requireAdmin, async (req, re
         });
     } catch (error) {
         console.error('Toggle user active error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error'
+        });
+    }
+});
+
+// Block user (admin only)
+router.put('/:id/block', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const userId = parseInt(req.params.id);
+        const { reason } = req.body;
+        
+        if (isNaN(userId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
+        }
+
+        // Check if user exists
+        const [users] = await pool.execute(
+            'SELECT id, is_admin, is_blocked FROM users WHERE id = ?',
+            [userId]
+        );
+
+        if (users.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Prevent blocking other admins
+        if (users[0].is_admin) {
+            return res.status(403).json({
+                success: false,
+                message: 'Cannot block admin users'
+            });
+        }
+
+        // Check if already blocked
+        if (users[0].is_blocked) {
+            return res.status(400).json({
+                success: false,
+                message: 'User is already blocked'
+            });
+        }
+
+        // Block user
+        await pool.execute(
+            'UPDATE users SET is_blocked = 1, blocked_at = NOW(), blocked_by = ?, block_reason = ? WHERE id = ?',
+            [req.user.id, reason || null, userId]
+        );
+
+        res.json({
+            success: true,
+            message: 'User blocked successfully',
+            is_blocked: true
+        });
+    } catch (error) {
+        console.error('Block user error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error'
+        });
+    }
+});
+
+// Unblock user (admin only)
+router.put('/:id/unblock', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const userId = parseInt(req.params.id);
+        
+        if (isNaN(userId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid user ID'
+            });
+        }
+
+        // Check if user exists
+        const [users] = await pool.execute(
+            'SELECT id, is_admin, is_blocked FROM users WHERE id = ?',
+            [userId]
+        );
+
+        if (users.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Check if not blocked
+        if (!users[0].is_blocked) {
+            return res.status(400).json({
+                success: false,
+                message: 'User is not blocked'
+            });
+        }
+
+        // Unblock user
+        await pool.execute(
+            'UPDATE users SET is_blocked = 0, blocked_at = NULL, blocked_by = NULL, block_reason = NULL WHERE id = ?',
+            [userId]
+        );
+
+        res.json({
+            success: true,
+            message: 'User unblocked successfully',
+            is_blocked: false
+        });
+    } catch (error) {
+        console.error('Unblock user error:', error);
         res.status(500).json({
             success: false,
             message: 'Server error'
