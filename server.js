@@ -40,44 +40,9 @@ app.use(helmet({
     crossOriginEmbedderPolicy: false
 }));
 
-// CORS configuration
+// CORS configuration - Allow all origins
 const corsOptions = {
-    origin: function (origin, callback) {
-        // Allow requests with no origin (mobile apps, postman, etc.)
-        if (!origin) return callback(null, true);
-        
-        const allowedOrigins = process.env.NODE_ENV === 'production' 
-            ? [
-                /^chrome-extension:\/\/.*$/,
-                /^moz-extension:\/\/.*$/,
-                process.env.FRONTEND_URL,
-                process.env.ADMIN_URL
-              ].filter(Boolean)
-            : [
-                'http://localhost:3000',
-                'http://localhost:3001',
-                'http://127.0.0.1:3000',
-                /^chrome-extension:\/\/.*$/,
-                /^moz-extension:\/\/.*$/
-              ];
-
-        // Check if origin matches any allowed pattern
-        const isAllowed = allowedOrigins.some(allowedOrigin => {
-            if (typeof allowedOrigin === 'string') {
-                return origin === allowedOrigin;
-            } else if (allowedOrigin instanceof RegExp) {
-                return allowedOrigin.test(origin);
-            }
-            return false;
-        });
-
-        if (isAllowed) {
-            callback(null, true);
-        } else {
-            console.warn(`CORS blocked origin: ${origin}`);
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
+    origin: true, // Allow all origins
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

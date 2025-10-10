@@ -222,19 +222,45 @@ router.post('/test-line', authenticateToken, async (req, res) => {
         const testMessage = `Website Monitor - Test Message\nSent: ${new Date().toLocaleString('ja-JP')}`;
 
         const results = [];
+        let successCount = 0;
+        let errorCount = 0;
+        
         for (const u of allUsers) {
             try {
                 const result = await notificationService.sendLineNotification(u.id, null, testMessage, true);
                 results.push({ userId: u.id, line_user_id: u.line_user_id, result });
+                if (result.success) successCount++;
+                else errorCount++;
             } catch (err) {
                 results.push({ userId: u.id, line_user_id: u.line_user_id, error: err.message });
+                errorCount++;
             }
 
             // small delay to avoid rate limits
             await new Promise(r => setTimeout(r, 300));
         }
 
-        res.json({ success: true, message: `Broadcast LINE test sent to ${allUsers.length} users`, results });
+        // Provide detailed results
+        const response = {
+            success: true,
+            message: `LINE test completed: ${successCount} successful, ${errorCount} failed`,
+            results: {
+                totalUsers: allUsers.length,
+                successful: successCount,
+                failed: errorCount,
+                details: results
+            }
+        };
+
+        // If all failed, provide helpful error message
+        if (successCount === 0 && errorCount > 0) {
+            const firstError = results.find(r => r.error);
+            if (firstError && firstError.error.includes("hasn't added the LINE Official Account as a friend")) {
+                response.error = "Users need to add the LINE bot as a friend. Get QR code from LINE Developers Console.";
+            }
+        }
+
+        res.json(response);
 
     } catch (error) {
         console.error('Comprehensive test LINE error:', error);
