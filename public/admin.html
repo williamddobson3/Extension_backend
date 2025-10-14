@@ -860,13 +860,6 @@
         // Toggle user active status
         async function toggleUserActive(userId, isCurrentlyActive) {
             const action = isCurrentlyActive ? '無効化' : '有効化';
-            const confirmMessage = isCurrentlyActive ? 
-                'このユーザーを無効化してもよろしいですか？' : 
-                'このユーザーを有効化してもよろしいですか？';
-
-            if (!confirm(confirmMessage)) {
-                return;
-            }
 
             try {
                 const response = await fetch(`${API_BASE_URL}/users/${userId}/toggle-active`, {
@@ -897,10 +890,6 @@
             const reason = prompt('ブロック理由を入力してください（オプション）:');
             if (reason === null) return; // User cancelled
 
-            if (!confirm('このユーザーをブロックしてもよろしいですか？ユーザーはシステムにアクセスできなくなります。')) {
-                return;
-            }
-
             try {
                 const response = await fetch(`${API_BASE_URL}/users/${userId}/block`, {
                     method: 'PUT',
@@ -914,7 +903,19 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    showNotification('ユーザーをブロックしました', 'success');
+                    let message = 'ユーザーをブロックしました';
+                    if (data.ip_blocking_results && data.ip_blocking_results.length > 0) {
+                        const blockedIPs = data.ip_blocking_results.filter(result => result.status === 'blocked');
+                        const failedIPs = data.ip_blocking_results.filter(result => result.status === 'failed' || result.status === 'error');
+                        
+                        if (blockedIPs.length > 0) {
+                            message += ` (IPアドレス ${blockedIPs.length}件をブロック)`;
+                        }
+                        if (failedIPs.length > 0) {
+                            message += ` (IPブロック失敗 ${failedIPs.length}件)`;
+                        }
+                    }
+                    showNotification(message, 'success');
                     loadUsers(); // Refresh the list
                 } else {
                     showNotification(data.message || 'ユーザーをブロックできませんでした', 'error');
@@ -927,9 +928,6 @@
 
         // Unblock user
         async function unblockUser(userId) {
-            if (!confirm('このユーザーのブロックを解除してもよろしいですか？')) {
-                return;
-            }
 
             try {
                 const response = await fetch(`${API_BASE_URL}/users/${userId}/unblock`, {
@@ -943,7 +941,19 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    showNotification('ユーザーのブロックを解除しました', 'success');
+                    let message = 'ユーザーのブロックを解除しました';
+                    if (data.ip_unblocking_results && data.ip_unblocking_results.length > 0) {
+                        const unblockedIPs = data.ip_unblocking_results.filter(result => result.status === 'unblocked');
+                        const failedIPs = data.ip_unblocking_results.filter(result => result.status === 'failed' || result.status === 'error');
+                        
+                        if (unblockedIPs.length > 0) {
+                            message += ` (IPアドレス ${unblockedIPs.length}件のブロック解除)`;
+                        }
+                        if (failedIPs.length > 0) {
+                            message += ` (IPブロック解除失敗 ${failedIPs.length}件)`;
+                        }
+                    }
+                    showNotification(message, 'success');
                     loadUsers(); // Refresh the list
                 } else {
                     showNotification(data.message || 'ユーザーのブロック解除に失敗しました', 'error');
@@ -956,9 +966,6 @@
 
         // Delete user
         async function deleteUser(userId) {
-            if (!confirm('このユーザーを削除してもよろしいですか？この操作は元に戻せません。')) {
-                return;
-            }
 
             try {
                 const response = await fetch(`${API_BASE_URL}/users/${userId}`, {

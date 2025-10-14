@@ -1,6 +1,7 @@
 const express = require('express');
 const { pool } = require('../config/database');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const ipBlockingService = require('../services/ipBlockingService');
 
 const router = express.Router();
 
@@ -196,16 +197,62 @@ router.put('/:id/block', authenticateToken, requireAdmin, async (req, res) => {
             });
         }
 
+        // Get user's recent IP addresses
+        const [userIPs] = await pool.execute(`
+            SELECT DISTINCT ip_address 
+            FROM user_ip_history 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 5
+        `, [userId]);
+
         // Block user
         await pool.execute(
             'UPDATE users SET is_blocked = 1, blocked_at = NOW(), blocked_by = ?, block_reason = ? WHERE id = ?',
             [req.user.id, reason || null, userId]
         );
 
+        // Block user's IP addresses
+        let ipBlockingResults = [];
+        for (const ipRecord of userIPs) {
+            const ipAddress = ipRecord.ip_address;
+            const blockReason = `User blocked: ${reason || 'No reason provided'}`;
+            
+            try {
+                const ipBlockResult = await ipBlockingService.blockIPAddress(
+                    ipAddress, 
+                    blockReason, 
+                    req.user.id
+                );
+                
+                if (ipBlockResult.success) {
+                    ipBlockingResults.push({
+                        ip: ipAddress,
+                        status: 'blocked',
+                        message: 'IP blocked successfully'
+                    });
+                } else {
+                    ipBlockingResults.push({
+                        ip: ipAddress,
+                        status: 'failed',
+                        message: ipBlockResult.error || 'Failed to block IP'
+                    });
+                }
+            } catch (ipError) {
+                console.error(`Error blocking IP ${ipAddress}:`, ipError);
+                ipBlockingResults.push({
+                    ip: ipAddress,
+                    status: 'error',
+                    message: ipError.message
+                });
+            }
+        }
+
         res.json({
             success: true,
             message: 'User blocked successfully',
-            is_blocked: true
+            is_blocked: true,
+            ip_blocking_results: ipBlockingResults
         });
     } catch (error) {
         console.error('Block user error:', error);
@@ -249,16 +296,60 @@ router.put('/:id/unblock', authenticateToken, requireAdmin, async (req, res) => 
             });
         }
 
+        // Get user's recent IP addresses
+        const [userIPs] = await pool.execute(`
+            SELECT DISTINCT ip_address 
+            FROM user_ip_history 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 5
+        `, [userId]);
+
         // Unblock user
         await pool.execute(
             'UPDATE users SET is_blocked = 0, blocked_at = NULL, blocked_by = NULL, block_reason = NULL WHERE id = ?',
             [userId]
         );
 
+        // Unblock user's IP addresses
+        let ipUnblockingResults = [];
+        for (const ipRecord of userIPs) {
+            const ipAddress = ipRecord.ip_address;
+            
+            try {
+                const ipUnblockResult = await ipBlockingService.unblockIPAddress(
+                    ipAddress, 
+                    req.user.id
+                );
+                
+                if (ipUnblockResult.success) {
+                    ipUnblockingResults.push({
+                        ip: ipAddress,
+                        status: 'unblocked',
+                        message: 'IP unblocked successfully'
+                    });
+                } else {
+                    ipUnblockingResults.push({
+                        ip: ipAddress,
+                        status: 'failed',
+                        message: ipUnblockResult.message || 'Failed to unblock IP'
+                    });
+                }
+            } catch (ipError) {
+                console.error(`Error unblocking IP ${ipAddress}:`, ipError);
+                ipUnblockingResults.push({
+                    ip: ipAddress,
+                    status: 'error',
+                    message: ipError.message
+                });
+            }
+        }
+
         res.json({
             success: true,
             message: 'User unblocked successfully',
-            is_blocked: false
+            is_blocked: false,
+            ip_unblocking_results: ipUnblockingResults
         });
     } catch (error) {
         console.error('Unblock user error:', error);
