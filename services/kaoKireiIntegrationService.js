@@ -23,10 +23,18 @@ class KaoKireiIntegrationService {
             // Detect product changes
             const changeResult = await this.changeDetector.detectProductChanges(siteId);
             
-            if (changeResult.hasChanged) {
-                console.log(`🔄 Product changes detected for site ID: ${siteId}`);
+            // Use notification guard to ensure notifications are only sent when appropriate
+            const notificationGuardService = require('./notificationGuardService');
+            const guardResult = await notificationGuardService.shouldSendNotifications(siteId, changeResult);
+            
+            // Log the guard decision
+            await notificationGuardService.logGuardDecision(siteId, guardResult, changeResult);
+            
+            if (guardResult.shouldSend) {
+                console.log(`🔄 Product changes detected and approved for site ID: ${siteId}`);
                 console.log(`   Reason: ${changeResult.reason}`);
                 console.log(`   Change Type: ${changeResult.changeType}`);
+                console.log(`   Guard Result: ${guardResult.reason}`);
                 
                 // Get site information
                 const siteInfo = await this.getSiteInfo(siteId);
@@ -46,14 +54,25 @@ class KaoKireiIntegrationService {
                     removedProducts: changeResult.removedProducts,
                     modifiedProducts: changeResult.modifiedProducts,
                     notificationsSent: notificationResult.success,
-                    notificationDetails: notificationResult
+                    notificationDetails: notificationResult,
+                    guardResult: guardResult
                 };
             } else {
-                console.log(`✅ No product changes detected for site ID: ${siteId}`);
+                console.log(`🛡️ Kao Kirei notifications BLOCKED for site ID ${siteId}: ${guardResult.reason}`);
+                console.log(`   Change detected: ${changeResult.hasChanged}`);
+                console.log(`   Guard checks:`, guardResult.guardChecks);
+                
                 return {
-                    hasChanged: false,
+                    hasChanged: changeResult.hasChanged,
                     reason: changeResult.reason,
-                    isFirstCheck: changeResult.isFirstCheck
+                    changeType: changeResult.changeType,
+                    addedProducts: changeResult.addedProducts,
+                    removedProducts: changeResult.removedProducts,
+                    modifiedProducts: changeResult.modifiedProducts,
+                    notificationsSent: false,
+                    notificationsBlocked: true,
+                    blockReason: guardResult.reason,
+                    guardResult: guardResult
                 };
             }
 

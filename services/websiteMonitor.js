@@ -324,9 +324,17 @@ class WebsiteMonitor {
             // Detect changes
             const changeResult = await this.detectChanges(siteId);
             
-            if (changeResult.hasChanged) {
-                console.log(`🔄 Changes detected for site ID: ${siteId}`);
+            // Use notification guard to ensure notifications are only sent when appropriate
+            const notificationGuardService = require('./notificationGuardService');
+            const guardResult = await notificationGuardService.shouldSendNotifications(siteId, changeResult);
+            
+            // Log the guard decision
+            await notificationGuardService.logGuardDecision(siteId, guardResult, changeResult);
+            
+            if (guardResult.shouldSend) {
+                console.log(`🔄 Changes detected and approved for site ID: ${siteId}`);
                 console.log(`   Reason: ${changeResult.reason}`);
+                console.log(`   Guard Result: ${guardResult.reason}`);
                 
                 // Trigger notifications to all users watching this site
                 try {
@@ -343,7 +351,8 @@ class WebsiteMonitor {
                         hasChanged: true,
                         reason: changeResult.reason,
                         notificationsSent: notificationResult.success,
-                        notificationDetails: notificationResult
+                        notificationDetails: notificationResult,
+                        guardResult: guardResult
                     };
                     
                 } catch (notificationError) {
@@ -352,12 +361,23 @@ class WebsiteMonitor {
                         hasChanged: true,
                         reason: changeResult.reason,
                         notificationsSent: false,
-                        notificationError: notificationError.message
+                        notificationError: notificationError.message,
+                        guardResult: guardResult
                     };
                 }
             } else {
-                console.log(`✅ サイトID ${siteId}で変更は検出されませんでした`);
-                return changeResult;
+                console.log(`🛡️ Notifications BLOCKED for site ID ${siteId}: ${guardResult.reason}`);
+                console.log(`   Change detected: ${changeResult.hasChanged}`);
+                console.log(`   Guard checks:`, guardResult.guardChecks);
+                
+                return {
+                    hasChanged: changeResult.hasChanged,
+                    reason: changeResult.reason,
+                    notificationsSent: false,
+                    notificationsBlocked: true,
+                    blockReason: guardResult.reason,
+                    guardResult: guardResult
+                };
             }
             
         } catch (error) {
