@@ -3,11 +3,15 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const { 
+    checkIPBlockingForRegistration, 
+    checkIPBlockingForLogin 
+} = require('../middleware/ipBlockingMiddleware');
 
 const router = express.Router();
 
 // Register new user
-router.post('/register', async (req, res) => {
+router.post('/register', checkIPBlockingForRegistration, async (req, res) => {
     try {
         const { username, email, password, line_user_id } = req.body;
 
@@ -114,7 +118,7 @@ router.post('/register', async (req, res) => {
 });
 
 // Login user
-router.post('/login', async (req, res) => {
+router.post('/login', checkIPBlockingForLogin, async (req, res) => {
     try {
         const { username, password } = req.body;
 

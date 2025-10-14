@@ -90,7 +90,7 @@ class EnhancedWebsiteScraper {
             });
 
             const responseTime = Date.now() - startTime;
-            
+
             return {
                 success: true,
                 content: response.data,
@@ -125,16 +125,16 @@ class EnhancedWebsiteScraper {
             
             // Navigate to the page
             await page.goto(url, { 
-                waitUntil: 'networkidle2', 
+                waitUntil: 'networkidle2',
                 timeout: 30000 
             });
             
             // Get page content
             const content = await page.content();
             const responseTime = Date.now() - startTime;
-            
+
             await page.close();
-            
+
             return {
                 success: true,
                 content: content,
@@ -155,23 +155,23 @@ class EnhancedWebsiteScraper {
     // Fallback scraping method
     async scrapeWithFallback(url) {
         try {
-            const startTime = Date.now();
-            
-            const response = await axios.get(url, {
-                headers: {
-                    'User-Agent': this.userAgent
-                },
+        const startTime = Date.now();
+        
+        const response = await axios.get(url, {
+            headers: {
+                'User-Agent': this.userAgent
+            },
                 timeout: 15000,
                 maxRedirects: 3,
                 validateStatus: () => true
-            });
+        });
 
-            const responseTime = Date.now() - startTime;
-            
-            return {
-                success: true,
-                content: response.data,
-                statusCode: response.status,
+        const responseTime = Date.now() - startTime;
+
+        return {
+            success: true,
+            content: response.data,
+            statusCode: response.status,
                 responseTime,
                 method: 'fallback'
             };
@@ -526,9 +526,9 @@ class EnhancedWebsiteScraper {
             let successCount = 0;
             let errorCount = 0;
             let changeCount = 0;
-
-            for (const site of sites) {
-                try {
+        
+        for (const site of sites) {
+            try {
                     console.log(`\n${'='.repeat(80)}`);
                     console.log(`🌐 Site: ${site.name}`);
                     console.log(`🔗 URL: ${site.url}`);
@@ -549,7 +549,7 @@ class EnhancedWebsiteScraper {
                         console.log(`❌ Site processing failed: ${result.error}`);
                     }
 
-                } catch (error) {
+            } catch (error) {
                     errorCount++;
                     console.error(`❌ Error processing site ${site.name}:`, error.message);
                 }
