@@ -887,9 +887,6 @@
 
         // Block user
         async function blockUser(userId) {
-            const reason = prompt('ブロック理由を入力してください（オプション）:');
-            if (reason === null) return; // User cancelled
-
             try {
                 const response = await fetch(`${API_BASE_URL}/users/${userId}/block`, {
                     method: 'PUT',
@@ -897,7 +894,7 @@
                         'Authorization': `Bearer ${authToken}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ reason: reason || null })
+                    body: JSON.stringify({ reason: null })
                 });
 
                 const data = await response.json();

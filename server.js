@@ -28,6 +28,7 @@ const usersRoutes = require('./routes/users');
 const broadcastRoutes = require('./routes/broadcast');
 const kaoKireiTestRoutes = require('./routes/kaoKireiTest');
 const ipManagementRoutes = require('./routes/ipManagement');
+const blockingVerificationRoutes = require('./routes/blockingVerification');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -83,6 +84,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/broadcast', broadcastRoutes);
 app.use('/api/kao-kirei', kaoKireiTestRoutes);
 app.use('/api/ip-management', ipManagementRoutes);
+app.use('/api/blocking-verification', blockingVerificationRoutes);
 
 // Admin page route
 app.get('/admin', (req, res) => {
