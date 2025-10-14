@@ -200,22 +200,38 @@ class NotificationGuardService {
      */
     async logGuardDecision(siteId, guardResult, changeResult) {
         try {
+            // Ensure all values are properly defined (no undefined values)
+            const safeGuardResult = {
+                shouldSend: Boolean(guardResult?.shouldSend),
+                reason: guardResult?.reason || null,
+                guardChecks: {
+                    hasChanges: Boolean(guardResult?.guardChecks?.hasChanges),
+                    isFirstCheck: Boolean(guardResult?.guardChecks?.isFirstCheck),
+                    hasError: Boolean(guardResult?.guardChecks?.hasError),
+                    isDuplicate: Boolean(guardResult?.guardChecks?.isDuplicate)
+                }
+            };
+
+            const safeChangeResult = {
+                reason: changeResult?.reason || null
+            };
+
             await pool.execute(`
                 INSERT INTO notification_guard_logs 
                 (site_id, should_send, reason, has_changes, is_first_check, has_error, is_duplicate, change_reason, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
             `, [
                 siteId,
-                guardResult.shouldSend,
-                guardResult.reason,
-                guardResult.guardChecks.hasChanges,
-                guardResult.guardChecks.isFirstCheck,
-                guardResult.guardChecks.hasError,
-                guardResult.guardChecks.isDuplicate,
-                changeResult.reason
+                safeGuardResult.shouldSend,
+                safeGuardResult.reason,
+                safeGuardResult.guardChecks.hasChanges,
+                safeGuardResult.guardChecks.isFirstCheck,
+                safeGuardResult.guardChecks.hasError,
+                safeGuardResult.guardChecks.isDuplicate,
+                safeChangeResult.reason
             ]);
 
-            console.log(`📝 Guard decision logged for site ID ${siteId}: ${guardResult.shouldSend ? 'APPROVED' : 'BLOCKED'}`);
+            console.log(`📝 Guard decision logged for site ID ${siteId}: ${safeGuardResult.shouldSend ? 'APPROVED' : 'BLOCKED'}`);
         } catch (error) {
             console.error('❌ Error logging guard decision:', error);
         }

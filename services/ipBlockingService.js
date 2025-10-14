@@ -63,6 +63,8 @@ class IPBlockingService {
                 AND (expires_at IS NULL OR expires_at > NOW())
             `, [ipAddress]);
 
+            console.log(`📊 Found ${blockedIPs.length} blocked IP records for ${ipAddress}`);
+
             if (blockedIPs.length > 0) {
                 const blockedIP = blockedIPs[0];
                 console.log(`🚫 IP ${ipAddress} is blocked: ${blockedIP.block_reason}`);
@@ -115,13 +117,13 @@ class IPBlockingService {
 
         } catch (error) {
             console.error(`❌ Error checking IP blocking for ${ipAddress}:`, error);
-            // In case of error, allow access but log the error
+            // In case of error, block access for security
             return {
-                isBlocked: false,
-                reason: null,
+                isBlocked: true,
+                reason: `IP blocking service error: ${error.message}`,
                 blockedBy: null,
                 expiresAt: null,
-                blockType: null,
+                blockType: 'error',
                 error: error.message
             };
         }

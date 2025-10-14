@@ -67,19 +67,26 @@ async function checkIPBlockingForRegistration(req, res, next) {
     } catch (error) {
         console.error('❌ Error in IP blocking middleware for registration:', error);
         
-        // In case of error, allow access but log the error
+        // In case of error, block access for security
         const ipAddress = ipBlockingService.extractIPAddress(req);
         await ipBlockingService.logIPAccess(
             ipAddress, 
             null, 
-            'registration', 
+            'blocked_registration', 
             req, 
-            false, 
+            true, 
             `Middleware error: ${error.message}`
         );
 
-        req.clientIP = ipAddress;
-        next();
+        return res.status(500).json({
+            success: false,
+            message: 'システムエラーが発生しました',
+            error: 'MIDDLEWARE_ERROR',
+            details: {
+                ipAddress: ipAddress,
+                error: error.message
+            }
+        });
     }
 }
 
@@ -144,19 +151,26 @@ async function checkIPBlockingForLogin(req, res, next) {
     } catch (error) {
         console.error('❌ Error in IP blocking middleware for login:', error);
         
-        // In case of error, allow access but log the error
+        // In case of error, block access for security
         const ipAddress = ipBlockingService.extractIPAddress(req);
         await ipBlockingService.logIPAccess(
             ipAddress, 
             null, 
-            'login', 
+            'blocked_login', 
             req, 
-            false, 
+            true, 
             `Middleware error: ${error.message}`
         );
 
-        req.clientIP = ipAddress;
-        next();
+        return res.status(500).json({
+            success: false,
+            message: 'システムエラーが発生しました',
+            error: 'MIDDLEWARE_ERROR',
+            details: {
+                ipAddress: ipAddress,
+                error: error.message
+            }
+        });
     }
 }
 

@@ -90,6 +90,13 @@ router.post('/register', checkIPBlockingForRegistration, async (req, res) => {
             [result.insertId, lineEnabled, line_user_id || null]
         );
 
+        // Log IP address for the new user
+        const ipAddress = req.clientIP || req.ip || req.connection?.remoteAddress || '127.0.0.1';
+        await pool.execute(`
+            INSERT INTO user_ip_history (user_id, ip_address, action, user_agent, created_at)
+            VALUES (?, ?, 'registration', ?, NOW())
+        `, [result.insertId, ipAddress, req.headers['user-agent'] || null]);
+
         const token = jwt.sign(
             { userId: result.insertId },
             process.env.JWT_SECRET,
@@ -169,6 +176,13 @@ router.post('/login', checkIPBlockingForLogin, async (req, res) => {
                 message: 'Invalid credentials'
             });
         }
+
+        // Log IP address for the login
+        const ipAddress = req.clientIP || req.ip || req.connection?.remoteAddress || '127.0.0.1';
+        await pool.execute(`
+            INSERT INTO user_ip_history (user_id, ip_address, action, user_agent, created_at)
+            VALUES (?, ?, 'login', ?, NOW())
+        `, [user.id, ipAddress, req.headers['user-agent'] || null]);
 
         // Generate JWT token
         const token = jwt.sign(
