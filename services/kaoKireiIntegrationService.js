@@ -222,6 +222,55 @@ class KaoKireiIntegrationService {
     }
 
     /**
+     * Process a single Kao Kirei site (scrape, detect changes, send notifications)
+     * @param {Object} site - Site object with id, url, name, etc.
+     * @returns {Object} Processing result
+     */
+    async processSite(site) {
+        try {
+            console.log(`🚀 Processing Kao Kirei site: ${site.name} (${site.url})`);
+
+            // Check for product changes
+            const changeResult = await this.checkKaoKireiSite(site.id);
+            
+            if (changeResult.hasChanged) {
+                console.log(`🔔 Changes detected for site ${site.name}: ${changeResult.reason}`);
+                
+                return {
+                    success: true,
+                    hasChanged: true,
+                    changeResult: changeResult,
+                    siteName: site.name,
+                    siteUrl: site.url,
+                    message: `Successfully processed ${site.name} with changes detected`
+                };
+            } else {
+                console.log(`✅ No changes detected for site ${site.name}`);
+                
+                return {
+                    success: true,
+                    hasChanged: false,
+                    changeResult: changeResult,
+                    siteName: site.name,
+                    siteUrl: site.url,
+                    message: `Successfully processed ${site.name} - no changes detected`
+                };
+            }
+
+        } catch (error) {
+            console.error(`❌ Error processing site ${site.name}:`, error);
+            return {
+                success: false,
+                hasChanged: false,
+                error: error.message,
+                siteName: site.name,
+                siteUrl: site.url,
+                message: `Error processing ${site.name}: ${error.message}`
+            };
+        }
+    }
+
+    /**
      * Check all Kao Kirei sites for product changes
      * @returns {Object} Overall check result
      */

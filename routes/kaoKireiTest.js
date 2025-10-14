@@ -91,14 +91,17 @@ router.post('/test-scraping', requireAuth, async (req, res) => {
                 
                 const siteResult = await kaoKireiService.processSite(site);
                 
-                if (siteResult.success && siteResult.changesDetected) {
+                if (siteResult.success && siteResult.hasChanged) {
                     results.changesDetected++;
                     results.changes.push({
                         siteId: site.id,
                         siteName: site.name,
                         siteUrl: site.url,
-                        changeType: siteResult.changeType || 'Product changes detected',
-                        changeDetails: siteResult.changeDetails || 'Products added or removed',
+                        changeType: siteResult.changeResult?.changeType || 'Product changes detected',
+                        changeDetails: siteResult.changeResult?.reason || 'Products added or removed',
+                        addedProducts: siteResult.changeResult?.addedProducts || [],
+                        removedProducts: siteResult.changeResult?.removedProducts || [],
+                        modifiedProducts: siteResult.changeResult?.modifiedProducts || [],
                         timestamp: new Date().toISOString()
                     });
                     
