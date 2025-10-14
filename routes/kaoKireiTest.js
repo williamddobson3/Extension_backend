@@ -1,7 +1,7 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
 const KaoKireiIntegrationService = require('../services/kaoKireiIntegrationService');
-const bulkNotificationService = require('../services/bulkNotificationService');
+const enhancedBulkNotificationService = require('../services/enhancedBulkNotificationService');
 
 const router = express.Router();
 
@@ -131,23 +131,24 @@ router.post('/test-scraping', requireAuth, async (req, res) => {
 
                 console.log(`👥 Found ${users.length} active users to notify`);
 
-                // Send notifications for each change
+                // Send enhanced notifications for each change with product details
                 for (const change of results.changes) {
-                    const notificationResult = await bulkNotificationService.notifySiteChange(
+                    const productChanges = {
+                        addedProducts: change.addedProducts || [],
+                        removedProducts: change.removedProducts || [],
+                        modifiedProducts: change.modifiedProducts || [],
+                        changeType: change.changeType,
+                        reason: change.changeDetails
+                    };
+
+                    const notificationResult = await enhancedBulkNotificationService.notifyKaoKireiProductChange(
                         change.siteId,
-                        {
-                            hasChanged: true,
-                            changeType: change.changeType,
-                            reason: change.changeDetails,
-                            addedProducts: [],
-                            removedProducts: [],
-                            modifiedProducts: []
-                        }
+                        productChanges
                     );
 
                     if (notificationResult.success) {
                         results.notificationsSent += notificationResult.successCount;
-                        console.log(`✅ Sent ${notificationResult.successCount} notifications for ${change.siteName}`);
+                        console.log(`✅ Sent ${notificationResult.successCount} enhanced notifications for ${change.siteName}`);
                     } else {
                         console.error(`❌ Failed to send notifications for ${change.siteName}:`, notificationResult.reason);
                     }

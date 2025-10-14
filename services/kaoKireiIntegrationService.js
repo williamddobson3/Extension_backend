@@ -1,5 +1,5 @@
 const KaoKireiChangeDetector = require('./kaoKireiChangeDetector');
-const bulkNotificationService = require('./bulkNotificationService');
+const enhancedBulkNotificationService = require('./enhancedBulkNotificationService');
 
 /**
  * Integration service for Kao Kirei sites
@@ -100,43 +100,33 @@ class KaoKireiIntegrationService {
      */
     async sendProductChangeNotifications(siteId, changeResult, siteInfo) {
         try {
-            // Get users to notify
-            const users = await this.changeDetector.getUsersToNotify(siteId);
-            
-            if (users.length === 0) {
-                return {
-                    success: false,
-                    reason: 'No users to notify',
-                    successCount: 0,
-                    totalUsers: 0
-                };
-            }
+            console.log(`🔔 Sending Kao Kirei product change notifications for site ID: ${siteId}`);
 
-            // Generate notification message
-            const message = this.changeDetector.generateNotificationMessage(changeResult, siteInfo.name);
-            
-            if (!message) {
-                return {
-                    success: false,
-                    reason: 'Could not generate notification message',
-                    successCount: 0,
-                    totalUsers: users.length
-                };
-            }
+            // Prepare product changes data for enhanced notification
+            const productChanges = {
+                addedProducts: changeResult.addedProducts || [],
+                removedProducts: changeResult.removedProducts || [],
+                modifiedProducts: changeResult.modifiedProducts || [],
+                changeType: changeResult.changeType,
+                reason: changeResult.reason
+            };
 
-            // Send notifications
-            const notificationResult = await this.sendNotificationsToUsers(users, message, siteInfo);
+            // Use enhanced notification service for Kao Kirei sites
+            const notificationResult = await enhancedBulkNotificationService.notifyKaoKireiProductChange(
+                siteId, 
+                productChanges
+            );
             
             return {
-                success: true,
-                successCount: notificationResult.successCount,
-                totalUsers: users.length,
-                siteName: siteInfo.name,
-                message: message
+                success: notificationResult.success,
+                successCount: notificationResult.successCount || 0,
+                totalUsers: notificationResult.totalUsers || 0,
+                message: notificationResult.success ? 'Kao Kirei product notifications sent successfully' : 'Failed to send notifications',
+                details: notificationResult
             };
 
         } catch (error) {
-            console.error('❌ Error sending product change notifications:', error);
+            console.error('❌ Error sending Kao Kirei product change notifications:', error);
             return {
                 success: false,
                 error: error.message,
