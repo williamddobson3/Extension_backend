@@ -175,6 +175,9 @@ router.post('/test-email', authenticateToken, async (req, res) => {
     try {
         console.log(`🧪 Starting comprehensive email test for user ${req.user.id}`);
         
+        // Get custom message and HTML from request body
+        const { message, subject, htmlMessage } = req.body;
+        
         // Broadcast test email to ALL users in the database
         const [allUsers] = await pool.execute('SELECT id, email FROM users');
         if (allUsers.length === 0) {
@@ -182,13 +185,17 @@ router.post('/test-email', authenticateToken, async (req, res) => {
         }
 
         const notificationService = require('../services/notificationService');
-        const testMessage = `ウェブサイト監視システム - テストメッセージ\n送信日時: ${new Date().toLocaleString('ja-JP')}`;
+        
+        // Use custom message if provided, otherwise use default
+        const testMessage = message || `ウェブサイト監視システム - テストメッセージ\n送信日時: ${new Date().toLocaleString('ja-JP')}`;
+        const emailSubject = subject || 'Website Monitor - Test';
+        const htmlContent = htmlMessage || null;
 
         const results = [];
         for (const u of allUsers) {
             try {
                 // Force send regardless of user preference
-                const result = await notificationService.sendEmail(u.id, null, testMessage, 'Website Monitor - Test', true);
+                const result = await notificationService.sendEmail(u.id, null, testMessage, emailSubject, true, htmlContent);
                 results.push({ userId: u.id, email: u.email, result });
             } catch (err) {
                 results.push({ userId: u.id, email: u.email, error: err.message });

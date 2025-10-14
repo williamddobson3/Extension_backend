@@ -142,7 +142,7 @@ class NotificationService {
     }
 
     // Send email notification
-    async sendEmail(userId, siteId, message, subject = 'ウェブサイト更新が検出されました', force = false) {
+    async sendEmail(userId, siteId, message, subject = 'ウェブサイト更新が検出されました', force = false, htmlContent = null) {
         try {
             let user, siteName, siteUrl;
             
