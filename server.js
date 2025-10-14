@@ -26,6 +26,7 @@ const notificationsRoutes = require('./routes/notifications');
 const lineRoutes = require('./routes/line');
 const usersRoutes = require('./routes/users');
 const broadcastRoutes = require('./routes/broadcast');
+const kaoKireiTestRoutes = require('./routes/kaoKireiTest');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -79,6 +80,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/line', lineRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/broadcast', broadcastRoutes);
+app.use('/api/kao-kirei', kaoKireiTestRoutes);
 
 // Admin page route
 app.get('/admin', (req, res) => {
