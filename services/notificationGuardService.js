@@ -218,16 +218,14 @@ class NotificationGuardService {
 
             await pool.execute(`
                 INSERT INTO notification_guard_logs 
-                (site_id, should_send, reason, has_changes, is_first_check, has_error, is_duplicate, change_reason, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                (site_id, decision, reason, guard_checks, change_detected, change_reason)
+                VALUES (?, ?, ?, ?, ?, ?)
             `, [
                 siteId,
-                safeGuardResult.shouldSend,
+                safeGuardResult.shouldSend ? 'allow' : 'block',
                 safeGuardResult.reason,
+                JSON.stringify(safeGuardResult.guardChecks),
                 safeGuardResult.guardChecks.hasChanges,
-                safeGuardResult.guardChecks.isFirstCheck,
-                safeGuardResult.guardChecks.hasError,
-                safeGuardResult.guardChecks.isDuplicate,
                 safeChangeResult.reason
             ]);
 

@@ -213,40 +213,49 @@ router.put('/:id/block', authenticateToken, requireAdmin, async (req, res) => {
             [req.user.id, reason || null, userId]
         );
 
-        // Block user's IP addresses
+        // Block user's IP addresses (if any exist)
         let ipBlockingResults = [];
-        for (const ipRecord of userIPs) {
-            const ipAddress = ipRecord.ip_address;
-            const blockReason = `User blocked: ${reason || 'No reason provided'}`;
-            
-            try {
-                const ipBlockResult = await ipBlockingService.blockIPAddress(
-                    ipAddress, 
-                    blockReason, 
-                    req.user.id
-                );
+        if (userIPs.length > 0) {
+            for (const ipRecord of userIPs) {
+                const ipAddress = ipRecord.ip_address;
+                const blockReason = `User blocked: ${reason || 'No reason provided'}`;
                 
-                if (ipBlockResult.success) {
+                try {
+                    const ipBlockResult = await ipBlockingService.blockIPAddress(
+                        ipAddress, 
+                        blockReason, 
+                        req.user.id
+                    );
+                    
+                    if (ipBlockResult.success) {
+                        ipBlockingResults.push({
+                            ip: ipAddress,
+                            status: 'blocked',
+                            message: 'IP blocked successfully'
+                        });
+                    } else {
+                        ipBlockingResults.push({
+                            ip: ipAddress,
+                            status: 'failed',
+                            message: ipBlockResult.error || 'Failed to block IP'
+                        });
+                    }
+                } catch (ipError) {
+                    console.error(`Error blocking IP ${ipAddress}:`, ipError);
                     ipBlockingResults.push({
                         ip: ipAddress,
-                        status: 'blocked',
-                        message: 'IP blocked successfully'
-                    });
-                } else {
-                    ipBlockingResults.push({
-                        ip: ipAddress,
-                        status: 'failed',
-                        message: ipBlockResult.error || 'Failed to block IP'
+                        status: 'error',
+                        message: ipError.message
                     });
                 }
-            } catch (ipError) {
-                console.error(`Error blocking IP ${ipAddress}:`, ipError);
-                ipBlockingResults.push({
-                    ip: ipAddress,
-                    status: 'error',
-                    message: ipError.message
-                });
             }
+        } else {
+            // No IP history found - add a note about this
+            ipBlockingResults.push({
+                ip: 'N/A',
+                status: 'no_history',
+                message: 'No IP history found for this user'
+            });
         }
 
         res.json({
@@ -313,38 +322,47 @@ router.put('/:id/unblock', authenticateToken, requireAdmin, async (req, res) => 
             [userId]
         );
 
-        // Unblock user's IP addresses
+        // Unblock user's IP addresses (if any exist)
         let ipUnblockingResults = [];
-        for (const ipRecord of userIPs) {
-            const ipAddress = ipRecord.ip_address;
-            
-            try {
-                const ipUnblockResult = await ipBlockingService.unblockIPAddress(
-                    ipAddress, 
-                    req.user.id
-                );
+        if (userIPs.length > 0) {
+            for (const ipRecord of userIPs) {
+                const ipAddress = ipRecord.ip_address;
                 
-                if (ipUnblockResult.success) {
+                try {
+                    const ipUnblockResult = await ipBlockingService.unblockIPAddress(
+                        ipAddress, 
+                        req.user.id
+                    );
+                    
+                    if (ipUnblockResult.success) {
+                        ipUnblockingResults.push({
+                            ip: ipAddress,
+                            status: 'unblocked',
+                            message: 'IP unblocked successfully'
+                        });
+                    } else {
+                        ipUnblockingResults.push({
+                            ip: ipAddress,
+                            status: 'failed',
+                            message: ipUnblockResult.message || 'Failed to unblock IP'
+                        });
+                    }
+                } catch (ipError) {
+                    console.error(`Error unblocking IP ${ipAddress}:`, ipError);
                     ipUnblockingResults.push({
                         ip: ipAddress,
-                        status: 'unblocked',
-                        message: 'IP unblocked successfully'
-                    });
-                } else {
-                    ipUnblockingResults.push({
-                        ip: ipAddress,
-                        status: 'failed',
-                        message: ipUnblockResult.message || 'Failed to unblock IP'
+                        status: 'error',
+                        message: ipError.message
                     });
                 }
-            } catch (ipError) {
-                console.error(`Error unblocking IP ${ipAddress}:`, ipError);
-                ipUnblockingResults.push({
-                    ip: ipAddress,
-                    status: 'error',
-                    message: ipError.message
-                });
             }
+        } else {
+            // No IP history found - add a note about this
+            ipUnblockingResults.push({
+                ip: 'N/A',
+                status: 'no_history',
+                message: 'No IP history found for this user'
+            });
         }
 
         res.json({
