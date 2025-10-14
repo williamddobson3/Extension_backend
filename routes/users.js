@@ -199,10 +199,11 @@ router.put('/:id/block', authenticateToken, requireAdmin, async (req, res) => {
 
         // Get user's recent IP addresses
         const [userIPs] = await pool.execute(`
-            SELECT DISTINCT ip_address 
+            SELECT DISTINCT ip_address, MAX(created_at) as latest_created_at
             FROM user_ip_history 
             WHERE user_id = ? 
-            ORDER BY created_at DESC 
+            GROUP BY ip_address
+            ORDER BY latest_created_at DESC 
             LIMIT 5
         `, [userId]);
 
@@ -298,10 +299,11 @@ router.put('/:id/unblock', authenticateToken, requireAdmin, async (req, res) => 
 
         // Get user's recent IP addresses
         const [userIPs] = await pool.execute(`
-            SELECT DISTINCT ip_address 
+            SELECT DISTINCT ip_address, MAX(created_at) as latest_created_at
             FROM user_ip_history 
             WHERE user_id = ? 
-            ORDER BY created_at DESC 
+            GROUP BY ip_address
+            ORDER BY latest_created_at DESC 
             LIMIT 5
         `, [userId]);
 
