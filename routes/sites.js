@@ -135,16 +135,16 @@ router.post('/', authenticateToken, async (req, res) => {
             });
         }
 
-        // Check if site already exists globally
+        // Check if site already exists for this user only
         const [existingSites] = await pool.execute(
-            'SELECT id FROM monitored_sites WHERE url = ?',
-            [url]
+            'SELECT id FROM monitored_sites WHERE url = ? AND user_id = ?',
+            [url, req.user.id]
         );
 
         if (existingSites.length > 0) {
             return res.status(409).json({
                 success: false,
-                message: 'This URL is already being monitored'
+                message: 'You are already monitoring this URL'
             });
         }
 

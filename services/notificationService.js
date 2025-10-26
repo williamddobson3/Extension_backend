@@ -377,73 +377,36 @@ class NotificationService {
         }
     }
 
-    // Send LINE notification
+    // Send LINE notification via channel broadcast
     async sendLineNotification(userId, siteId, message, force = false) {
         try {
-            let user, siteName, siteUrl;
+            let siteName, siteUrl;
             
             if (siteId) {
-                // Get user LINE ID and site info for real notifications
-                const [users] = await pool.execute(
-                    `SELECT u.line_user_id, ms.name as site_name, ms.url 
-                     FROM users u 
-                     JOIN monitored_sites ms ON ms.id = ? 
-                     WHERE u.id = ?`,
-                    [siteId, userId]
+                // Get site info for real notifications
+                const [sites] = await pool.execute(
+                    `SELECT name, url FROM monitored_sites WHERE id = ?`,
+                    [siteId]
                 );
                 
-                if (users.length === 0) {
-                    throw new Error('User or site not found');
+                if (sites.length === 0) {
+                    throw new Error('Site not found');
                 }
                 
-                user = users[0];
-                siteName = user.site_name;
-                siteUrl = user.url;
+                siteName = sites[0].name;
+                siteUrl = sites[0].url;
             } else {
                 // Handle test notifications
-                const [users] = await pool.execute(
-                    'SELECT line_user_id FROM users WHERE id = ?',
-                    [userId]
-                );
-                
-                if (users.length === 0) {
-                    throw new Error('User not found');
-                }
-                
-                user = { line_user_id: users[0].line_user_id };
                 siteName = 'Test Site';
                 siteUrl = 'https://example.com';
-            }
-
-            if (!user.line_user_id) {
-                throw new Error('LINE user ID not configured');
-            }
-            
-            // Validate LINE User ID format
-            if (typeof user.line_user_id !== 'string') {
-                throw new Error('LINE user ID must be a string');
-            }
-            
-            // Trim whitespace and validate format
-            const trimmedLineUserId = user.line_user_id.trim();
-            if (!trimmedLineUserId) {
-                throw new Error('LINE user ID is empty');
-            }
-            
-            if (!trimmedLineUserId.startsWith('U')) {
-                throw new Error('LINE user ID must start with "U"');
-            }
-            
-            if (trimmedLineUserId.length < 30) {
-                throw new Error('LINE user ID appears to be too short');
             }
 
             if (!this.lineConfig.channelAccessToken) {
                 throw new Error('LINE channel access token not configured');
             }
 
-            const lineMessage = {
-                to: trimmedLineUserId,
+            // Create broadcast message for the official LINE channel
+            const broadcastMessage = {
                 messages: [
                     {
                         type: 'text',
@@ -455,14 +418,17 @@ class NotificationService {
 📝 詳細:
 ${message}
 
-この通知は、ウェブサイト監視システムによって自動的に送信されました。`
+この通知は、ウェブサイト監視システムによって自動的に送信されました。
+
+📱 友だち追加: https://lin.ee/61Qp02m`
                     }
                 ]
             };
 
+            // Send broadcast to LINE channel instead of individual push
             const response = await axios.post(
-                'https://api.line.me/v2/bot/message/push',
-                lineMessage,
+                'https://api.line.me/v2/bot/message/broadcast',
+                broadcastMessage,
                 {
                     headers: {
                         'Content-Type': 'application/json',
@@ -476,40 +442,18 @@ ${message}
                 await this.saveNotification(userId, siteId, 'line', message, 'sent');
             }
 
-            console.log(`✅ LINE message sent to user ${userId}`);
+            console.log(`✅ LINE broadcast sent to official channel for site: ${siteName}`);
             return { success: true, response: response.data };
 
         } catch (error) {
-            console.error('❌ LINE notification failed:', error);
-            
-            // Check for specific LINE API errors
-            let errorMessage = error.message;
-            if (error.response && error.response.data) {
-                const apiError = error.response.data.message;
-                
-                if (apiError === "You can't send messages to yourself") {
-                    errorMessage = 'エラー: ボット自身のLINE IDが設定されています。正しいユーザーのLINE IDを設定してください。';
-                    console.error('⚠️ Bot tried to send message to itself. User needs to update their LINE ID.');
-                } else if (apiError.includes("The user hasn't added the LINE Official Account as a friend")) {
-                    errorMessage = 'エラー: ユーザーがLINEボットを友達に追加していません。';
-                    console.error('⚠️ User needs to add the bot as a friend.');
-                } else if (apiError.includes("invalid")) {
-                    errorMessage = 'エラー: LINE User IDの形式が無効です。';
-                    console.error('⚠️ Invalid LINE User ID format.');
-                } else if (apiError.includes("The property, 'to'")) {
-                    errorMessage = 'エラー: LINE User IDが無効です。正しい形式で入力してください。';
-                    console.error('⚠️ Invalid LINE User ID in "to" field.');
-                } else if (apiError) {
-                    errorMessage = `LINE API Error: ${apiError}`;
-                }
-            }
+            console.error('❌ LINE broadcast failed:', error);
             
             // Save failed notification only for real notifications (not test ones)
             if (siteId) {
                 await this.saveNotification(userId, siteId, 'line', message, 'failed');
             }
             
-            return { success: false, error: errorMessage };
+            return { success: false, error: error.message };
         }
     }
 

@@ -182,65 +182,58 @@ class NotificationService {
         }
     }
 
-    // Send LINE notification
+    // Send LINE notification via channel broadcast
     async sendLineNotification(userId, siteId, message) {
         try {
-            let user, siteName, siteUrl;
+            let siteName, siteUrl;
             
             if (siteId) {
-                // Get user LINE ID and site info for real notifications
-                const [users] = await pool.execute(
-                    `SELECT u.line_user_id, ms.name as site_name, ms.url 
-                     FROM users u 
-                     JOIN monitored_sites ms ON ms.id = ? 
-                     WHERE u.id = ?`,
-                    [siteId, userId]
+                // Get site info for real notifications
+                const [sites] = await pool.execute(
+                    `SELECT name, url FROM monitored_sites WHERE id = ?`,
+                    [siteId]
                 );
                 
-                if (users.length === 0) {
-                    throw new Error('User or site not found');
+                if (sites.length === 0) {
+                    throw new Error('Site not found');
                 }
                 
-                user = users[0];
-                siteName = user.site_name;
-                siteUrl = user.url;
+                siteName = sites[0].name;
+                siteUrl = sites[0].url;
             } else {
                 // Handle test notifications
-                const [users] = await pool.execute(
-                    'SELECT line_user_id FROM users WHERE id = ?',
-                    [userId]
-                );
-                
-                if (users.length === 0) {
-                    throw new Error('User not found');
-                }
-                
-                user = { line_user_id: users[0].line_user_id };
                 siteName = 'Test Site';
                 siteUrl = 'https://example.com';
-            }
-
-            if (!user.line_user_id) {
-                throw new Error('LINE user ID not configured');
             }
 
             if (!this.lineConfig.channelAccessToken) {
                 throw new Error('LINE channel access token not configured');
             }
 
-            const lineMessage = {
-                to: user.line_user_id,
+            // Create broadcast message for the official LINE channel
+            const broadcastMessage = {
                 messages: [
                     {
                         type: 'text',
-                        text: `🔔 ウェブサイト更新が検出されました！\n\n📊 サイト: ${siteName}\n🌐 URL: ${siteUrl}\n\n📝 詳細:\n${message}\n\nこの通知は、ウェブサイト監視システムによって自動的に送信されました。`
+                        text: `🔔 ウェブサイト更新が検出されました！
+
+📊 サイト: ${siteName}
+🌐 URL: ${siteUrl}
+
+📝 詳細:
+${message}
+
+この通知は、ウェブサイト監視システムによって自動的に送信されました。
+
+📱 友だち追加: https://lin.ee/61Qp02m`
                     }
                 ]
             };
 
+            // Send broadcast to LINE channel instead of individual push
             const response = await axios.post(
-                'https://api.line.me/v2/bot/message/push',
-                lineMessage,
+                'https://api.line.me/v2/bot/message/broadcast',
+                broadcastMessage,
                 {
                     headers: {
                         'Content-Type': 'application/json',
@@ -254,11 +247,11 @@ class NotificationService {
                 await this.saveNotification(userId, siteId, 'line', message, 'sent');
             }
 
-            console.log(`✅ LINE message sent to user ${userId}`);
+            console.log(`✅ LINE broadcast sent to official channel for site: ${siteName}`);
             return { success: true, response: response.data };
 
         } catch (error) {
-            console.error('❌ LINE notification failed:', error);
+            console.error('❌ LINE broadcast failed:', error);
             
             // Save failed notification only for real notifications (not test ones)
             if (siteId) {

@@ -84,14 +84,33 @@ class BulkNotificationService {
 
             // Send notifications to each user
             const results = [];
+            
+            // Send one LINE broadcast to the official channel (instead of individual messages)
+            let lineBroadcastResult = null;
+            try {
+                // Use the first user as a reference for the broadcast
+                const firstUser = users[0];
+                lineBroadcastResult = await this.notificationService.sendLineNotification(
+                    firstUser.id,
+                    siteId,
+                    notificationMessage
+                );
+                console.log('✅ LINE broadcast sent to official channel');
+            } catch (error) {
+                console.error('❌ LINE broadcast failed:', error);
+                lineBroadcastResult = { success: false, error: error.message };
+            }
+            
+            // Send individual email notifications to each user
             for (const user of users) {
                 try {
-                    const result = await this.notifyUser(user, siteId, notificationMessage, changeDetails);
+                    const result = await this.notifyUserEmail(user, siteId, notificationMessage, changeDetails);
                     results.push({
                         userId: user.id,
                         email: user.email,
                         success: result.success,
-                        error: result.error || result.reason
+                        error: result.error || result.reason,
+                        lineBroadcast: lineBroadcastResult
                     });
                 } catch (error) {
                     console.error(`Failed to notify user ${user.id}:`, error);
@@ -99,7 +118,8 @@ class BulkNotificationService {
                         userId: user.id,
                         email: user.email,
                         success: false,
-                        error: error.message
+                        error: error.message,
+                        lineBroadcast: lineBroadcastResult
                     });
                 }
             }
@@ -157,7 +177,7 @@ class BulkNotificationService {
 この通知は、ウェブサイト監視システムによって自動的に送信されました。`;
     }
 
-    // Notify a single user about a site change
+    // Notify a single user about a site change (email only, LINE is handled by broadcast)
     async notifyUser(user, siteId, message, changeDetails) {
         try {
             const results = {
@@ -180,23 +200,50 @@ class BulkNotificationService {
                 }
             }
 
-            // Send LINE notification if enabled
-            if (user.line_enabled && user.line_user_id) {
+            // LINE notifications are now handled by channel broadcast, not individual messages
+            // Users will receive notifications through the official LINE channel
+
+            // Determine overall success
+            const hasSuccess = (results.email && results.email.success);
+
+            return {
+                success: hasSuccess,
+                results
+            };
+
+        } catch (error) {
+            console.error(`Error notifying user ${user.id}:`, error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    // Notify a single user about a site change (email only)
+    async notifyUserEmail(user, siteId, message, changeDetails) {
+        try {
+            const results = {
+                email: null
+            };
+
+            // Send email notification if enabled
+            if (user.email_enabled && user.email) {
                 try {
-                    results.line = await this.notificationService.sendLineNotification(
+                    results.email = await this.notificationService.sendEmail(
                         user.id,
                         siteId,
-                        message
+                        message,
+                        'ウェブサイト更新が検出されました'
                     );
                 } catch (error) {
-                    console.error(`LINE notification failed for user ${user.id}:`, error);
-                    results.line = { success: false, error: error.message };
+                    console.error(`Email notification failed for user ${user.id}:`, error);
+                    results.email = { success: false, error: error.message };
                 }
             }
 
             // Determine overall success
-            const hasSuccess = (results.email && results.email.success) || 
-                             (results.line && results.line.success);
+            const hasSuccess = (results.email && results.email.success);
 
             return {
                 success: hasSuccess,

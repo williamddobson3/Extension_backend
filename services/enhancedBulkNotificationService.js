@@ -319,23 +319,11 @@ ${productDetails}
                 }
             }
 
-            // Send LINE notification if enabled
-            if (user.line_enabled && user.line_user_id) {
-                try {
-                    results.line = await this.notificationService.sendLineNotification(
-                        user.id,
-                        siteId,
-                        message
-                    );
-                } catch (error) {
-                    console.error(`LINE notification failed for user ${user.id}:`, error);
-                    results.line = { success: false, error: error.message };
-                }
-            }
+            // LINE notifications are now handled by channel broadcast, not individual messages
+            // Users will receive notifications through the official LINE channel
 
             // Determine overall success
-            const hasSuccess = (results.email && results.email.success) || 
-                             (results.line && results.line.success);
+            const hasSuccess = (results.email && results.email.success);
 
             return {
                 success: hasSuccess,
@@ -496,23 +484,11 @@ ${productDetails}
                 }
             }
 
-            // Send LINE notification if enabled
-            if (user.line_enabled && user.line_user_id) {
-                try {
-                    results.line = await this.notificationService.sendLineNotification(
-                        user.id,
-                        siteId,
-                        message
-                    );
-                } catch (error) {
-                    console.error(`LINE notification failed for user ${user.id}:`, error);
-                    results.line = { success: false, error: error.message };
-                }
-            }
+            // LINE notifications are now handled by channel broadcast, not individual messages
+            // Users will receive notifications through the official LINE channel
 
             // Determine overall success
-            const hasSuccess = (results.email && results.email.success) || 
-                             (results.line && results.line.success);
+            const hasSuccess = (results.email && results.email.success);
 
             return {
                 success: hasSuccess,

@@ -141,7 +141,7 @@ router.post('/', authenticateToken, async (req, res) => {
         if (existingSites.length > 0) {
             return res.status(409).json({
                 success: false,
-                message: 'This URL is already being monitored'
+                message: 'You are already monitoring this URL'
             });
         }
 
