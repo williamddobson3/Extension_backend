@@ -1,0 +1,84 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   LINE MESSAGING API - QUICK REFERENCE                       ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📱 YOUR BOT INFORMATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Bot Name:        佐藤
+Basic ID:        @568ultax
+Channel ID:      2008360670
+Followers:       1
+Message Quota:   200/month
+
+
+🧪 TESTING COMMANDS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Verify setup and send test broadcast
+node verify-line-setup.js
+
+# Send test broadcast
+node test-line-broadcast.js
+
+# Check statistics
+curl http://localhost:3003/api/broadcast/stats
+
+# Test via API
+curl -X POST http://localhost:3003/api/broadcast/test-channel
+
+
+📱 WHERE TO SEE MESSAGES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ LINE App → Chat with 佐藤 (@568ultax)
+✅ developers.line.biz → Analytics (statistics only)
+❌ manager.line.biz/broadcast (manual broadcasts only, NOT API)
+
+
+🔗 IMPORTANT URLS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Developers Console:
+https://developers.line.biz/console/channel/2008360670/
+
+Official Account Manager:
+https://manager.line.biz/account/@568ultax/home
+
+Add Friend:
+https://line.me/R/ti/p/@568ultax
+
+
+🚀 START SERVER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+cd "D:\work folder\jong\Extension_backend\Extension_backend"
+npm start
+
+
+✅ VERIFICATION STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Credentials: Updated
+✅ Bot Connection: Working
+✅ Test Broadcast: Sent Successfully
+✅ Server: Running
+✅ Extension: Ready
+
+
+⚠️  REMEMBER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• API broadcasts appear in LINE app chats, NOT in manager.line.biz
+• Check LINE app for messages from 佐藤 (@568ultax)
+• You have 200 messages/month quota
+• Each broadcast to N followers = N messages used
+
+
+🎯 QUICK TEST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Open Extension → 通知設定 tab
+2. Click "LINEテスト" button
+3. Open LINE app
+4. Check chat with 佐藤
+5. See message? ✅ Working!
+
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  STATUS: ✅ OPERATIONAL                                                      ║
+║  LAST VERIFIED: 2025-10-26                                                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
