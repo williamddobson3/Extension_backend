@@ -47,6 +47,58 @@ router.post('/webhook', verifyLineSignature, async (req, res) => {
     }
 });
 
+// Handle LINE follow event (user adds the official account)
+async function handleLineFollow(event) {
+    const { replyToken, source } = event;
+    const lineUserId = source.userId;
+
+    try {
+        console.log(`New LINE follow event from user: ${lineUserId}`);
+        
+        // Send welcome message
+        await replyToLine(replyToken, 
+            '👋 Welcome to Website Monitor!\n\n' +
+            'Your LINE User ID has been automatically registered: ' + lineUserId + '\n\n' +
+            'You will now receive website update notifications here!\n' +
+            'Thank you for using our service! 🎉'
+        );
+
+        // Log the follow event for potential user matching
+        await pool.execute(`
+            INSERT INTO line_follow_events (line_user_id, followed_at, status)
+            VALUES (?, NOW(), 'active')
+            ON DUPLICATE KEY UPDATE followed_at = NOW(), status = 'active'
+        `, [lineUserId]);
+
+        console.log(`LINE follow event logged for user: ${lineUserId}`);
+
+    } catch (error) {
+        console.error('Error handling LINE follow event:', error);
+    }
+}
+
+// Handle LINE unfollow event (user blocks the official account)
+async function handleLineUnfollow(event) {
+    const { source } = event;
+    const lineUserId = source.userId;
+
+    try {
+        console.log(`LINE unfollow event from user: ${lineUserId}`);
+        
+        // Update follow status
+        await pool.execute(`
+            UPDATE line_follow_events 
+            SET status = 'inactive', unfollowed_at = NOW() 
+            WHERE line_user_id = ?
+        `, [lineUserId]);
+
+        console.log(`LINE unfollow event logged for user: ${lineUserId}`);
+
+    } catch (error) {
+        console.error('Error handling LINE unfollow event:', error);
+    }
+}
+
 // Handle incoming LINE messages
 async function handleLineMessage(event) {
     const { replyToken, message, source } = event;
@@ -901,6 +953,98 @@ router.get('/oauth/url', (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to generate LINE OAuth URL'
+        });
+    }
+});
+
+// Auto-link LINE User ID to existing user account
+router.post('/auto-link', async (req, res) => {
+    try {
+        const { lineUserId, userId } = req.body;
+
+        if (!lineUserId || !userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'LINE User ID and User ID are required'
+            });
+        }
+
+        // Validate LINE User ID format (should start with 'U')
+        if (!lineUserId.startsWith('U') || lineUserId.length < 20) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid LINE User ID format'
+            });
+        }
+
+        // Check if LINE User ID is already linked to another user
+        const [existingUsers] = await pool.execute(
+            'SELECT id, username FROM users WHERE line_user_id = ? AND id != ?',
+            [lineUserId, userId]
+        );
+
+        if (existingUsers.length > 0) {
+            return res.status(409).json({
+                success: false,
+                message: 'This LINE User ID is already linked to another account'
+            });
+        }
+
+        // Update user with LINE User ID
+        await pool.execute(
+            'UPDATE users SET line_user_id = ? WHERE id = ?',
+            [lineUserId, userId]
+        );
+
+        // Update notification preferences
+        await pool.execute(
+            'UPDATE user_notifications SET line_enabled = true, line_user_id = ? WHERE user_id = ?',
+            [lineUserId, userId]
+        );
+
+        // Log the auto-link event
+        await pool.execute(`
+            INSERT INTO line_follow_events (line_user_id, followed_at, status)
+            VALUES (?, NOW(), 'active')
+            ON DUPLICATE KEY UPDATE followed_at = NOW(), status = 'active'
+        `, [lineUserId]);
+
+        res.json({
+            success: true,
+            message: 'LINE User ID linked successfully',
+            lineUserId
+        });
+
+    } catch (error) {
+        console.error('Error auto-linking LINE User ID:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to link LINE User ID'
+        });
+    }
+});
+
+// Get LINE User ID from follow events (for manual linking)
+router.get('/follow-events', async (req, res) => {
+    try {
+        const [events] = await pool.execute(`
+            SELECT line_user_id, followed_at, status 
+            FROM line_follow_events 
+            WHERE status = 'active' 
+            ORDER BY followed_at DESC 
+            LIMIT 100
+        `);
+
+        res.json({
+            success: true,
+            events
+        });
+
+    } catch (error) {
+        console.error('Error getting LINE follow events:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get LINE follow events'
         });
     }
 });
