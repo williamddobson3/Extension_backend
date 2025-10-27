@@ -26,6 +26,7 @@ const notificationsRoutes = require('./routes/notifications');
 const lineRoutes = require('./routes/line');
 const usersRoutes = require('./routes/users');
 const broadcastRoutes = require('./routes/broadcast');
+const targetedLineNotificationRoutes = require('./routes/targetedLineNotifications');
 const kaoKireiTestRoutes = require('./routes/kaoKireiTest');
 const ipManagementRoutes = require('./routes/ipManagement');
 const blockingVerificationRoutes = require('./routes/blockingVerification');
