@@ -83,6 +83,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/line', lineRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/broadcast', broadcastRoutes);
+app.use('/api/targeted-line', targetedLineNotificationRoutes);
 app.use('/api/kao-kirei', kaoKireiTestRoutes);
 app.use('/api/ip-management', ipManagementRoutes);
 app.use('/api/blocking-verification', blockingVerificationRoutes);
