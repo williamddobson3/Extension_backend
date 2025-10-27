@@ -13,7 +13,7 @@ const router = express.Router();
 // Register new user
 router.post('/register', checkIPBlockingForRegistration, async (req, res) => {
     try {
-        const { username, email, password, line_user_id } = req.body;
+        const { username, email, password, line_user_id, line_official_user_id } = req.body;
 
         // Validate input
         if (!username || !email || !password) {
@@ -79,15 +79,15 @@ router.post('/register', checkIPBlockingForRegistration, async (req, res) => {
 
         // Create user with LINE ID if provided
         const [result] = await pool.execute(
-            'INSERT INTO users (username, email, password_hash, line_user_id, is_admin) VALUES (?, ?, ?, ?, ?)',
-            [username, email, passwordHash, line_user_id || null, isAdmin || false]
+            'INSERT INTO users (username, email, password_hash, line_user_id, line_official_user_id, is_admin) VALUES (?, ?, ?, ?, ?, ?)',
+            [username, email, passwordHash, line_user_id || null, line_official_user_id || null, isAdmin || false]
         );
 
         // Create default notification preferences
-        const lineEnabled = line_user_id ? true : false;
+        const lineEnabled = (line_user_id || line_official_user_id) ? true : false;
         await pool.execute(
-            'INSERT INTO user_notifications (user_id, email_enabled, line_enabled, line_user_id) VALUES (?, true, ?, ?)',
-            [result.insertId, lineEnabled, line_user_id || null]
+            'INSERT INTO user_notifications (user_id, email_enabled, line_enabled, line_user_id, line_official_user_id) VALUES (?, true, ?, ?, ?)',
+            [result.insertId, lineEnabled, line_user_id || null, line_official_user_id || null]
         );
 
         // Log IP address for the new user
@@ -111,7 +111,8 @@ router.post('/register', checkIPBlockingForRegistration, async (req, res) => {
                 id: result.insertId,
                 username,
                 email,
-                line_user_id: line_user_id || null
+                line_user_id: line_user_id || null,
+                line_official_user_id: line_official_user_id || null
             }
         });
 

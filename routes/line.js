@@ -1049,6 +1049,124 @@ router.get('/follow-events', async (req, res) => {
     }
 });
 
+// Auto-detect LINE official user ID for registration
+router.post('/auto-detect-official-userid', async (req, res) => {
+    try {
+        const { userId } = req.body;
+
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: 'User ID is required'
+            });
+        }
+
+        // Get recent LINE follow events (last 5 minutes)
+        const [events] = await pool.execute(`
+            SELECT line_user_id, followed_at, status 
+            FROM line_follow_events 
+            WHERE status = 'active' 
+            AND followed_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+            ORDER BY followed_at DESC 
+            LIMIT 10
+        `);
+
+        if (events.length === 0) {
+            return res.json({
+                success: false,
+                message: 'No recent LINE follow events found. Please add the LINE official account as a friend first.',
+                events: []
+            });
+        }
+
+        // Check if any of these user IDs are already linked to other users
+        const availableEvents = [];
+        for (const event of events) {
+            const [existingUsers] = await pool.execute(
+                'SELECT id FROM users WHERE line_official_user_id = ? AND id != ?',
+                [event.line_user_id, userId]
+            );
+            
+            if (existingUsers.length === 0) {
+                availableEvents.push(event);
+            }
+        }
+
+        res.json({
+            success: true,
+            message: 'Available LINE official user IDs found',
+            events: availableEvents
+        });
+
+    } catch (error) {
+        console.error('Error auto-detecting LINE official user ID:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to auto-detect LINE official user ID'
+        });
+    }
+});
+
+// Link LINE official user ID to user account
+router.post('/link-official-userid', async (req, res) => {
+    try {
+        const { userId, lineOfficialUserId } = req.body;
+
+        if (!userId || !lineOfficialUserId) {
+            return res.status(400).json({
+                success: false,
+                message: 'User ID and LINE official user ID are required'
+            });
+        }
+
+        // Validate LINE official user ID format (should start with 'U')
+        if (!lineOfficialUserId.startsWith('U') || lineOfficialUserId.length < 20) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid LINE official user ID format'
+            });
+        }
+
+        // Check if LINE official user ID is already linked to another user
+        const [existingUsers] = await pool.execute(
+            'SELECT id, username FROM users WHERE line_official_user_id = ? AND id != ?',
+            [lineOfficialUserId, userId]
+        );
+
+        if (existingUsers.length > 0) {
+            return res.status(409).json({
+                success: false,
+                message: 'This LINE official user ID is already linked to another account'
+            });
+        }
+
+        // Update user with LINE official user ID
+        await pool.execute(
+            'UPDATE users SET line_official_user_id = ? WHERE id = ?',
+            [lineOfficialUserId, userId]
+        );
+
+        // Update notification preferences
+        await pool.execute(
+            'UPDATE user_notifications SET line_enabled = true, line_official_user_id = ? WHERE user_id = ?',
+            [lineOfficialUserId, userId]
+        );
+
+        res.json({
+            success: true,
+            message: 'LINE official user ID linked successfully',
+            lineOfficialUserId
+        });
+
+    } catch (error) {
+        console.error('Error linking LINE official user ID:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to link LINE official user ID'
+        });
+    }
+});
+
 // LINE OAuth Callback (for redirect handling)
 router.get('/oauth/callback', (req, res) => {
     try {

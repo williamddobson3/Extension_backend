@@ -14,6 +14,7 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
                 u.username, 
                 u.email, 
                 u.line_user_id, 
+                u.line_official_user_id,
                 u.is_active, 
                 u.is_admin, 
                 u.is_blocked,
@@ -24,12 +25,13 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
                 lfe.followed_at,
                 lfe.status as line_follow_status,
                 un.line_enabled,
-                un.line_user_id as notification_line_user_id
+                un.line_user_id as notification_line_user_id,
+                un.line_official_user_id as notification_line_official_user_id
             FROM users u
             LEFT JOIN monitored_sites ms ON u.id = ms.user_id
             LEFT JOIN line_follow_events lfe ON u.line_user_id = lfe.line_user_id
             LEFT JOIN user_notifications un ON u.id = un.user_id
-            GROUP BY u.id, lfe.followed_at, lfe.status, un.line_enabled, un.line_user_id
+            GROUP BY u.id, lfe.followed_at, lfe.status, un.line_enabled, un.line_user_id, un.line_official_user_id
             ORDER BY u.created_at DESC
         `);
 
@@ -40,10 +42,12 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
                 username: user.username,
                 email: user.email,
                 line_user_id: user.line_user_id,
+                line_official_user_id: user.line_official_user_id,
                 line_follow_status: user.line_follow_status,
                 line_followed_at: user.followed_at,
                 line_enabled: user.line_enabled,
                 notification_line_user_id: user.notification_line_user_id,
+                notification_line_official_user_id: user.notification_line_official_user_id,
                 is_active: user.is_active,
                 is_admin: user.is_admin,
                 is_blocked: user.is_blocked,
