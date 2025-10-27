@@ -11,6 +11,7 @@
     "setup-db": "node setup-database.js",
     "db:setup": "node setup-database.js",
     "db:reset": "node setup-database.js --reset",
+    "db:test": "node test-database.js",
     "build": "node build-distribution.js",
     "dist": "node build-distribution.js"
   },
