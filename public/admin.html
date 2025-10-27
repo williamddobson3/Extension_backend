@@ -292,6 +292,82 @@
             color: #6c757d;
         }
 
+        /* LINE info cells */
+        .line-cell {
+            text-align: left;
+            min-width: 200px;
+            max-width: 300px;
+        }
+
+        .line-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .line-user-id {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13.2px; /* 11px * 1.2 */
+            font-weight: 600;
+            color: #00c300;
+            background: #f0f8f0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #d4edda;
+        }
+
+        .line-user-id i {
+            color: #00c300;
+        }
+
+        .line-status {
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        .line-status .status-badge {
+            font-size: 11px;
+            padding: 2px 6px;
+        }
+
+        .line-status .status-badge.active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .line-status .status-badge.inactive {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .line-follow-date {
+            color: #666;
+            font-size: 11px;
+        }
+
+        .line-notification-status {
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        .notification-enabled {
+            color: #28a745;
+            font-weight: 500;
+            background: #d4edda;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+        }
+
+        .no-line {
+            color: #999;
+            font-style: italic;
+            font-size: 13px;
+        }
+
         /* Meta cells */
         .meta-cell {
             text-align: center;
@@ -563,7 +639,7 @@
                             <th class="sortable" data-sort="status"><i class="fas fa-shield-alt"></i> ステータス</th>
                             <th class="sortable" data-sort="sites"><i class="fas fa-globe"></i> サイト</th>
                             <th class="sortable" data-sort="created"><i class="fas fa-calendar"></i> 登録</th>
-                            <th><i class="fab fa-line"></i> LINE ID</th>
+                            <th><i class="fab fa-line"></i> LINE情報</th>
                             <th><i class="fas fa-cog"></i> アクション</th>
                         </tr>
                     </thead>
@@ -728,7 +804,8 @@
                     user.username.toLowerCase().includes(searchLower) ||
                     user.email.toLowerCase().includes(searchLower) ||
                     user.id.toString().includes(searchLower) ||
-                    (user.line_user_id && user.line_user_id.toLowerCase().includes(searchLower))
+                    (user.line_user_id && user.line_user_id.toLowerCase().includes(searchLower)) ||
+                    (user.notification_line_user_id && user.notification_line_user_id.toLowerCase().includes(searchLower))
                 );
             });
 
@@ -804,7 +881,30 @@
                         ${new Date(user.created_at).toLocaleDateString('ja-JP')}
                     </td>
                     <td class="line-cell">
-                        ${user.line_user_id || ''}
+                        <div class="line-info">
+                            ${user.line_user_id ? `
+                                <div class="line-user-id">
+                                    <i class="fab fa-line"></i> ${user.line_user_id}
+                                </div>
+                                ${user.line_follow_status ? `
+                                    <div class="line-status">
+                                        <span class="status-badge ${user.line_follow_status === 'active' ? 'active' : 'inactive'}">
+                                            ${user.line_follow_status === 'active' ? '友だち追加済み' : '友だち解除済み'}
+                                        </span>
+                                    </div>
+                                ` : ''}
+                                ${user.line_followed_at ? `
+                                    <div class="line-follow-date">
+                                        <small>追加: ${new Date(user.line_followed_at).toLocaleDateString('ja-JP')}</small>
+                                    </div>
+                                ` : ''}
+                                ${user.line_enabled ? `
+                                    <div class="line-notification-status">
+                                        <small class="notification-enabled">通知有効</small>
+                                    </div>
+                                ` : ''}
+                            ` : '<span class="no-line">未設定</span>'}
+                        </div>
                     </td>
                     <td class="actions-cell">
                         ${!user.is_admin ? `
