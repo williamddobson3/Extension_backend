@@ -32,7 +32,7 @@ const ipManagementRoutes = require('./routes/ipManagement');
 const blockingVerificationRoutes = require('./routes/blockingVerification');
 
 const app = express();
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.PORT || 3000;
 
 // Trust proxy for production deployments behind reverse proxies
 if (process.env.NODE_ENV === 'production' || process.env.TRUST_PROXY === 'true') {
