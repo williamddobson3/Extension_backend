@@ -12,6 +12,29 @@ class NotificationService {
             channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
             channelSecret: process.env.LINE_CHANNEL_SECRET
         };
+        
+        // Rate limiting for LINE notifications (token bucket)
+        this.lineRateLimit = {
+            tokens: 5, // Max 5 notifications per window
+            maxTokens: 5,
+            windowMs: 600000, // 10 minutes
+            lastRefill: Date.now()
+        };
+        
+        // Circuit breaker for LINE API
+        this.lineCircuitBreaker = {
+            state: 'closed', // 'closed', 'open', 'half-open'
+            failureCount: 0,
+            lastFailureTime: null,
+            successCount: 0,
+            failureThreshold: 5, // Open circuit after 5 failures
+            successThreshold: 2, // Close circuit after 2 successes
+            timeout: 60000 // 1 minute timeout before attempting half-open
+        };
+        
+        // Deduplication: track recent notifications to prevent duplicates
+        this.recentNotifications = new Map(); // Map<userId_siteId_messageHash, timestamp>
+        this.deduplicationWindow = 300000; // 5 minutes
     }
 
     // Initialize email transporter with multiple fallback strategies
@@ -377,13 +400,162 @@ class NotificationService {
         }
     }
 
-    // Send LINE notification via channel broadcast
-    async sendLineNotification(userId, siteId, message, force = false) {
+    // Check if notification is duplicate (deduplication)
+    _isDuplicateNotification(userId, siteId, message) {
+        const messageHash = require('crypto')
+            .createHash('md5')
+            .update(`${userId}_${siteId}_${message}`)
+            .digest('hex');
+        const key = `${userId}_${siteId}_${messageHash}`;
+        
+        const now = Date.now();
+        const recentTime = this.recentNotifications.get(key);
+        
+        if (recentTime && (now - recentTime) < this.deduplicationWindow) {
+            return true; // Duplicate detected
+        }
+        
+        // Clean old entries and add new one
+        for (const [k, v] of this.recentNotifications.entries()) {
+            if (now - v > this.deduplicationWindow) {
+                this.recentNotifications.delete(k);
+            }
+        }
+        this.recentNotifications.set(key, now);
+        return false;
+    }
+
+    // Refill rate limit tokens
+    _refillRateLimitTokens() {
+        const now = Date.now();
+        const elapsed = now - this.lineRateLimit.lastRefill;
+        
+        if (elapsed >= this.lineRateLimit.windowMs) {
+            this.lineRateLimit.tokens = this.lineRateLimit.maxTokens;
+            this.lineRateLimit.lastRefill = now;
+        } else {
+            // Refill tokens proportionally
+            const tokensToAdd = Math.floor(
+                (elapsed / this.lineRateLimit.windowMs) * this.lineRateLimit.maxTokens
+            );
+            this.lineRateLimit.tokens = Math.min(
+                this.lineRateLimit.maxTokens,
+                this.lineRateLimit.tokens + tokensToAdd
+            );
+            this.lineRateLimit.lastRefill = now;
+        }
+    }
+
+    // Check rate limit
+    _checkRateLimit() {
+        this._refillRateLimitTokens();
+        if (this.lineRateLimit.tokens <= 0) {
+            throw new Error('Rate limit exceeded. Please wait before sending more notifications.');
+        }
+        this.lineRateLimit.tokens--;
+    }
+
+    // Check circuit breaker state
+    _checkCircuitBreaker() {
+        const now = Date.now();
+        
+        if (this.lineCircuitBreaker.state === 'open') {
+            // Check if timeout has passed to attempt half-open
+            if (this.lineCircuitBreaker.lastFailureTime && 
+                (now - this.lineCircuitBreaker.lastFailureTime) >= this.lineCircuitBreaker.timeout) {
+                this.lineCircuitBreaker.state = 'half-open';
+                this.lineCircuitBreaker.successCount = 0;
+                console.log('🔄 LINE circuit breaker: Attempting half-open state');
+            } else {
+                throw new Error('Circuit breaker is open. LINE API is temporarily unavailable.');
+            }
+        }
+    }
+
+    // Update circuit breaker on success
+    _updateCircuitBreakerOnSuccess() {
+        if (this.lineCircuitBreaker.state === 'half-open') {
+            this.lineCircuitBreaker.successCount++;
+            if (this.lineCircuitBreaker.successCount >= this.lineCircuitBreaker.successThreshold) {
+                this.lineCircuitBreaker.state = 'closed';
+                this.lineCircuitBreaker.failureCount = 0;
+                console.log('✅ LINE circuit breaker: Closed (service recovered)');
+            }
+        } else {
+            // Reset failure count on success
+            this.lineCircuitBreaker.failureCount = 0;
+        }
+    }
+
+    // Update circuit breaker on failure
+    _updateCircuitBreakerOnFailure() {
+        this.lineCircuitBreaker.failureCount++;
+        this.lineCircuitBreaker.lastFailureTime = Date.now();
+        
+        if (this.lineCircuitBreaker.failureCount >= this.lineCircuitBreaker.failureThreshold) {
+            this.lineCircuitBreaker.state = 'open';
+            console.error('⚠️ LINE circuit breaker: Opened (too many failures)');
+        }
+    }
+
+    // Sleep helper for retry delays
+    _sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // Exponential backoff with jitter
+    _calculateBackoffDelay(attempt) {
+        const baseDelay = 1000; // 1 second
+        const maxDelay = 60000; // 60 seconds
+        const exponentialDelay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
+        const jitter = Math.random() * 1000; // Add random jitter up to 1 second
+        return exponentialDelay + jitter;
+    }
+
+    // Audit log for LINE notifications
+    async _auditLog(userId, siteId, action, status, details = {}) {
         try {
+            // Try to insert into line_notification_audit table, fallback to system_audit_logs
+            try {
+                await pool.execute(
+                    `INSERT INTO line_notification_audit 
+                    (user_id, site_id, action, status, details, created_at) 
+                    VALUES (?, ?, ?, ?, ?, NOW())`,
+                    [userId, siteId, action, status, JSON.stringify(details)]
+                );
+            } catch (tableError) {
+                // If table doesn't exist, use system_audit_logs as fallback
+                await pool.execute(
+                    `INSERT INTO system_audit_logs 
+                    (user_id, action, resource_type, resource_id, new_values, created_at) 
+                    VALUES (?, ?, 'line_notification', ?, ?, NOW())`,
+                    [userId, action, siteId, JSON.stringify({ status, ...details })]
+                );
+            }
+        } catch (error) {
+            console.error('Error writing LINE audit log:', error);
+            // Don't throw - audit logging failure shouldn't break notification flow
+        }
+    }
+
+    // Send LINE notification via channel broadcast with enhanced reliability
+    async sendLineNotification(userId, siteId, message, force = false, maxRetries = 3) {
+        const startTime = Date.now();
+        let attempt = 0;
+        
+        try {
+            // 1. Check for duplicates (deduplication)
+            if (!force && siteId && this._isDuplicateNotification(userId, siteId, message)) {
+                console.log(`⏭️ Skipping duplicate LINE notification for user ${userId}, site ${siteId}`);
+                await this._auditLog(userId, siteId, 'send_notification', 'skipped_duplicate', {
+                    reason: 'duplicate_detected'
+                });
+                return { success: true, skipped: true, reason: 'duplicate' };
+            }
+
+            // 2. Get site info
             let siteName, siteUrl;
-            
             if (siteId) {
-                // Get site info for real notifications
                 const [sites] = await pool.execute(
                     `SELECT name, url FROM monitored_sites WHERE id = ?`,
                     [siteId]
@@ -396,16 +568,22 @@ class NotificationService {
                 siteName = sites[0].name;
                 siteUrl = sites[0].url;
             } else {
-                // Handle test notifications
                 siteName = 'Test Site';
                 siteUrl = 'https://example.com';
             }
 
+            // 3. Validate configuration
             if (!this.lineConfig.channelAccessToken) {
                 throw new Error('LINE channel access token not configured');
             }
 
-            // Create broadcast message for the official LINE channel
+            // 4. Check circuit breaker
+            this._checkCircuitBreaker();
+
+            // 5. Check rate limit
+            this._checkRateLimit();
+
+            // 6. Create message
             const broadcastMessage = {
                 messages: [
                     {
@@ -425,35 +603,126 @@ ${message}
                 ]
             };
 
-            // Send broadcast to LINE channel instead of individual push
-            const response = await axios.post(
-                'https://api.line.me/v2/bot/message/broadcast',
-                broadcastMessage,
-                {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${this.lineConfig.channelAccessToken}`
-                    }
-                }
-            );
+            // 7. Retry logic with exponential backoff
+            let lastError = null;
+            while (attempt < maxRetries) {
+                try {
+                    const response = await axios.post(
+                        'https://api.line.me/v2/bot/message/broadcast',
+                        broadcastMessage,
+                        {
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${this.lineConfig.channelAccessToken}`
+                            },
+                            timeout: 10000 // 10 second timeout
+                        }
+                    );
 
-            // Save notification record only for real notifications (not test ones)
-            if (siteId) {
-                await this.saveNotification(userId, siteId, 'line', message, 'sent');
+                    // Success - update circuit breaker
+                    this._updateCircuitBreakerOnSuccess();
+
+                    // Save notification record
+                    if (siteId) {
+                        await this.saveNotification(userId, siteId, 'line', message, 'sent');
+                    }
+
+                    // Audit log
+                    const duration = Date.now() - startTime;
+                    await this._auditLog(userId, siteId, 'send_notification', 'success', {
+                        attempt: attempt + 1,
+                        duration_ms: duration,
+                        response_status: response.status
+                    });
+
+                    console.log(`✅ LINE broadcast sent to official channel for site: ${siteName} (attempt ${attempt + 1})`);
+                    return { 
+                        success: true, 
+                        response: response.data,
+                        attempt: attempt + 1,
+                        duration_ms: duration
+                    };
+
+                } catch (error) {
+                    lastError = error;
+                    attempt++;
+                    
+                    const httpStatus = error.response?.status;
+                    const errorMessage = error.response?.data?.message || error.message;
+                    
+                    // Don't retry on certain errors
+                    if (httpStatus === 400 || httpStatus === 401 || httpStatus === 403) {
+                        // Bad request, unauthorized, or forbidden - don't retry
+                        this._updateCircuitBreakerOnFailure();
+                        throw new Error(`LINE API error (${httpStatus}): ${errorMessage}`);
+                    }
+                    
+                    // Don't retry if we've exhausted attempts
+                    if (attempt >= maxRetries) {
+                        break;
+                    }
+                    
+                    // Calculate backoff delay
+                    const delay = this._calculateBackoffDelay(attempt - 1);
+                    console.log(`⚠️ LINE notification attempt ${attempt} failed, retrying in ${Math.round(delay)}ms...`);
+                    
+                    // Log retry attempt
+                    await this._auditLog(userId, siteId, 'send_notification', 'retry', {
+                        attempt: attempt,
+                        error: errorMessage,
+                        http_status: httpStatus,
+                        next_retry_in_ms: delay
+                    });
+                    
+                    await this._sleep(delay);
+                }
             }
 
-            console.log(`✅ LINE broadcast sent to official channel for site: ${siteName}`);
-            return { success: true, response: response.data };
-
-        } catch (error) {
-            console.error('❌ LINE broadcast failed:', error);
+            // All retries exhausted
+            this._updateCircuitBreakerOnFailure();
             
-            // Save failed notification only for real notifications (not test ones)
+            const finalError = lastError?.response?.data?.message || lastError?.message || 'Unknown error';
+            const httpStatus = lastError?.response?.status || 0;
+            
+            // Save failed notification
             if (siteId) {
                 await this.saveNotification(userId, siteId, 'line', message, 'failed');
             }
+
+            // Audit log failure
+            const duration = Date.now() - startTime;
+            await this._auditLog(userId, siteId, 'send_notification', 'failed', {
+                attempts: attempt,
+                final_error: finalError,
+                http_status: httpStatus,
+                duration_ms: duration
+            });
+
+            console.error(`❌ LINE broadcast failed after ${attempt} attempts:`, finalError);
             
-            return { success: false, error: error.message };
+            return { 
+                success: false, 
+                error: finalError,
+                attempts: attempt,
+                http_status: httpStatus
+            };
+
+        } catch (error) {
+            // Handle non-retryable errors
+            this._updateCircuitBreakerOnFailure();
+            
+            const errorMessage = error.message || 'Unknown error';
+            
+            if (siteId) {
+                await this.saveNotification(userId, siteId, 'line', message, 'failed');
+                await this._auditLog(userId, siteId, 'send_notification', 'failed', {
+                    error: errorMessage,
+                    non_retryable: true
+                });
+            }
+            
+            console.error('❌ LINE broadcast failed:', errorMessage);
+            return { success: false, error: errorMessage };
         }
     }
 
