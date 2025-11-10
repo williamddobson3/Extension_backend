@@ -3,8 +3,8 @@ require('dotenv').config();
 
 const dbConfig = {
     host: 'localhost',
-    user: 'root',
-    password: '',
+    user: 'app_user',
+    password: 'cupideroskama200334!!!#QWE',
     database: 'website_monitor',
     port: process.env.DB_PORT || 3306,
     waitForConnections: true,
