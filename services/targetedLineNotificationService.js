@@ -209,7 +209,7 @@ class TargetedLineNotificationService {
                 fullMessage += `\n\n🌐 サイト: ${siteInfo.name}`;
                 fullMessage += `\n🔗 URL: ${siteInfo.url}`;
             }
-            fullMessage += `\n\n📱 友だち追加: https://lin.ee/61Qp02m`;
+            fullMessage += `\n\n📱 友だち追加: https://lin.ee/zGt9q9V`;
 
             // Send individual push messages to each user with rate limiting and retry
             const results = [];
@@ -270,11 +270,15 @@ class TargetedLineNotificationService {
         try {
             // Get users watching this site who have LINE enabled
             const [users] = await pool.execute(
-                `SELECT DISTINCT u.line_user_id, u.line_display_name
+                `SELECT DISTINCT 
+                    COALESCE(u.line_official_user_id, u.line_user_id) AS line_user_id,
+                    u.line_display_name
                  FROM users u
                  JOIN monitored_sites ms ON u.id = ms.user_id
                  LEFT JOIN user_notifications un ON u.id = un.user_id
-                 WHERE ms.id = ? AND u.is_active = TRUE AND u.line_user_id IS NOT NULL 
+                 WHERE ms.id = ? 
+                 AND u.is_active = TRUE 
+                 AND COALESCE(u.line_official_user_id, u.line_user_id) IS NOT NULL
                  AND (un.line_enabled = TRUE OR un.line_enabled IS NULL)`,
                 [siteId]
             );
@@ -299,10 +303,13 @@ class TargetedLineNotificationService {
         try {
             // Get all users who have LINE enabled
             const [users] = await pool.execute(
-                `SELECT DISTINCT u.line_user_id, u.line_display_name
+                `SELECT DISTINCT 
+                    COALESCE(u.line_official_user_id, u.line_user_id) AS line_user_id,
+                    u.line_display_name
                  FROM users u
                  LEFT JOIN user_notifications un ON u.id = un.user_id
-                 WHERE u.is_active = TRUE AND u.line_user_id IS NOT NULL 
+                 WHERE u.is_active = TRUE 
+                 AND COALESCE(u.line_official_user_id, u.line_user_id) IS NOT NULL
                  AND (un.line_enabled = TRUE OR un.line_enabled IS NULL)`,
                 []
             );
@@ -327,10 +334,15 @@ class TargetedLineNotificationService {
         try {
             // Get user's LINE user ID
             const [users] = await pool.execute(
-                `SELECT u.line_user_id, u.line_display_name, un.line_enabled
+                `SELECT 
+                    COALESCE(u.line_official_user_id, u.line_user_id) AS line_user_id,
+                    u.line_display_name, 
+                    un.line_enabled
                  FROM users u
                  LEFT JOIN user_notifications un ON u.id = un.user_id
-                 WHERE u.id = ? AND u.is_active = TRUE AND u.line_user_id IS NOT NULL
+                 WHERE u.id = ? 
+                 AND u.is_active = TRUE 
+                 AND COALESCE(u.line_official_user_id, u.line_user_id) IS NOT NULL
                  AND (un.line_enabled = TRUE OR un.line_enabled IS NULL)`,
                 [userId]
             );
@@ -384,7 +396,7 @@ class TargetedLineNotificationService {
 
 この通知は、システムのテスト目的で送信されました。
 
-📱 友だち追加: https://lin.ee/61Qp02m`;
+📱 友だち追加: https://lin.ee/zGt9q9V`;
 
         return await this.sendToUsers([lineUserId], testMessage);
     }

@@ -4,7 +4,7 @@ require('dotenv').config();
 const dbConfig = {
     host: 'localhost',
     user: 'app_user',
-    password: 'password123!!!#QWE',
+    password: 'password123!!!QWE',
     database: 'website_monitor',
     port: process.env.DB_PORT || 3306,
     waitForConnections: true,
